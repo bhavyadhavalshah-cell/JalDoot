@@ -1,0 +1,16 @@
+{
+  "name": "JalDoot — Machhuaare Ka Saathi, Samundar Ka Saarthi",
+  "short_name": "JalDoot",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F7F6",
+  "theme_color": "#087E8B",
+  "description": "Marine Safety, Fish Zone Discovery & SOS Dispatch for Fishermen",
+  "icons": [
+    {
+      "src": "/static/assets/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
