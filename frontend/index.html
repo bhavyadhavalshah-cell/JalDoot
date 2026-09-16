@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JalDoot — Maritime Safety and Fisheries Navigation Portal</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#087E8B">
+
+  <!-- Leaflet.js CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- JalDoot Theme CSS -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand-wrapper">
+      <div class="brand-badge-logo">JALDOOT</div>
+      <div class="brand-titles">
+        <h1 data-i18n="appName">JalDoot</h1>
+        <span data-i18n="tagline">Machhuaare Ka Saathi , Samundar Ka Saarthi</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Requirement 2: Real-Time Live Clock Everywhere -->
+      <div class="live-clock-badge" id="live-clock-container" title="Indian Standard Time">
+        <span class="clock-indicator"></span>
+        <span id="live-clock-text">--:--:-- IST</span>
+      </div>
+
+      <!-- Multilingual Language Selector -->
+      <select id="lang-select" class="lang-select-box" title="Change Language">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी (Hindi)</option>
+        <option value="gu">ગુજરાતી (Gujarati)</option>
+      </select>
+
+      <!-- User Profile Widget (Profile Icon with Username Below It) -->
+      <div id="user-profile-widget" style="display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; margin: 0 4px;">
+        <div style="width:32px; height:32px; border-radius:50%; background:var(--primary-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; box-shadow:0 2px 4px rgba(0,0,0,0.15);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <span id="user-profile-display" style="font-size:0.72rem; font-weight:800; color:var(--text-primary); margin-top:2px; line-height:1.1; max-width:95px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      </div>
+
+      <button id="btn-logout" class="btn-nav-logout" style="display:none;" data-i18n="logout">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Network & Coverage Warning Banner -->
+  <div id="network-banner" class="network-banner" style="display: none;">
+    <span id="network-banner-text">Vessel telemetry active</span>
+  </div>
+
+  <!-- In-app Floating Alert Banner -->
+  <div id="in-app-alert-banner" class="network-banner" style="display: none; position: sticky; top: 58px; background:#FEF2F2; color:#D9383A; border-color:#FECACA;"></div>
+
+  <!-- Role Navigation Bar (Hidden for Fisherman; Admin only) -->
+  <nav id="role-nav-bar" class="role-nav-bar" style="display: none;"></nav>
+
+  <!-- Main View Container -->
+  <main class="main-content">
+
+    <!-- ====================================================================
+         1. AUTHENTICATION VIEW (LOGIN & FISHERMAN SIGNUP)
+         ==================================================================== -->
+    <section id="login-view" class="view-section active-view">
+      <div class="auth-container">
+        <div class="auth-header">
+          <h2 data-i18n="loginTitle">Sign In to JalDoot</h2>
+          <p data-i18n="loginSubtitle">Marine Safety & Fisheries Navigation Portal</p>
+        </div>
+
+        <!-- Layout Mode Selector at Login -->
+        <div class="form-group" style="background: var(--bg-canvas); padding: 10px; border-radius: 4px; border: 1px solid var(--border-light); margin-bottom: 14px;">
+          <label class="form-label" style="margin-bottom: 6px; font-weight:700;" data-i18n="interfaceMode">Interface Layout Mode</label>
+          <div style="display: flex; gap: 16px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+              <input type="radio" name="layout-mode" value="mobile" checked>
+              <span data-i18n="mobileLayout">Mobile Interface</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.8rem; cursor: pointer;">
+              <input type="radio" name="layout-mode" value="desktop">
+              <span data-i18n="desktopLayout">Desktop Interface</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Auth Tabs: Login vs Register -->
+        <div class="auth-tabs">
+          <button id="tab-login" class="auth-tab active" data-i18n="loginTab">Login</button>
+          <button id="tab-register" class="auth-tab" data-i18n="registerTab">Fisherman Registration</button>
+        </div>
+
+        <div id="auth-error-msg" style="display:none; color:var(--marker-red); background:#FEF2F2; padding:8px; border-radius:4px; font-size:0.8rem; margin-bottom:12px; font-weight:700;"></div>
+
+        <!-- Login Form -->
+        <form id="form-login">
+          <div class="form-group">
+            <label class="form-label" data-i18n="usernameOrEmail">Fisherman Name, Mobile Number (10 Digits) or Email</label>
+            <input type="text" id="login-username" class="form-input" data-i18n-placeholder="usernamePlaceholder" placeholder="e.g. Ramesh Kumar, 9825000001 or admin@gmail.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="password">Password</label>
+            <input type="password" id="login-password" class="form-input" data-i18n-placeholder="passwordPlaceholder" placeholder="Enter password" required>
+          </div>
+          <div style="display:flex; justify-content:flex-end; margin-bottom: 12px; margin-top:-4px;">
+            <a href="#" id="link-forgot-password" style="font-size:0.75rem; color:var(--primary-blue); font-weight:700; text-decoration:none;">Forgot Password? / પાસવર્ડ ભૂલી ગયા?</a>
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%;" data-i18n="signInBtn">Sign In</button>
+        </form>
+
+        <!-- Fisherman Registration Form -->
+        <form id="form-register" style="display: none;">
+          <div class="form-group">
+            <label class="form-label" data-i18n="regUsername">Fisherman Full Name / Username</label>
+            <input type="text" id="reg-username" class="form-input" data-i18n-placeholder="regUsernamePlaceholder" placeholder="e.g. Bhavesh Patel" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="password">Password</label>
+            <input type="password" id="reg-password" class="form-input" data-i18n-placeholder="passwordPlaceholder" placeholder="Choose a secure password" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="vesselNumber">Vessel Registration Number</label>
+            <input type="text" id="reg-vessel-no" class="form-input" placeholder="IND-GJ-01-4421" required>
+          </div>
+          <!-- Compulsory 10 digits validation -->
+          <div class="form-group">
+            <label class="form-label" data-i18n="phoneNumber">Compulsory Mobile Number (Exactly 10 Numeric Digits)</label>
+            <input type="tel" id="reg-phone" class="form-input" data-i18n-placeholder="regPhonePlaceholder" placeholder="9825012345" maxlength="10" minlength="10" pattern="[0-9]{10}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="vesselPhoto">Vessel Photo (Optional)</label>
+            <input type="file" id="reg-photo" class="form-input" accept="image/*">
+          </div>
+          <button type="submit" class="btn-primary" style="width: 100%;" data-i18n="registerBtn">Register Vessel & Sign In</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         2. FISHERMAN MODE VIEW (Strictly no Admin / Researcher access points)
+         ==================================================================== -->
+    <section id="fisherman-view" class="view-section">
+      <div class="fisherman-grid">
+        
+        <!-- Left Column: Map & Weather -->
+        <div class="fisherman-main-col">
+          
+          <!-- Sea Safety Score Card -->
+          <div class="card" style="padding: 12px 16px;">
+            <div class="safety-score-banner">
+              <div id="safety-score-circle" class="score-circle status-SAFE">
+                <span id="safety-score-val" class="score-number">88</span>
+                <span class="score-label">Score</span>
+              </div>
+              <div class="score-details">
+                <h3 id="safety-score-title" data-i18n="safeStatus">SAFE TO SAIL</h3>
+                <ul id="safety-score-reasons">
+                  <li>• Live coastal wind speed and wave height within safe limits.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Marine Map Card (Requirement 5 & 6: Restricted Bounds, Expanded Height) -->
+          <div class="card" style="margin-bottom: 0;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Operational Ocean Boundary Map</span>
+              <button id="btn-recenter-fisherman-map" class="btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; border-radius: 4px; display: flex; align-items: center; gap: 4px; background: #FFFFFF; cursor: pointer;" title="Center map on live GPS location">
+                <span>📍</span> Center My Location
+              </button>
+            </div>
+            <div id="fisherman-marine-map" class="marine-map-container" style="height: 480px;"></div>
+            <div class="map-legend">
+              <div class="legend-item"><span class="legend-dot green"></span> <span>Your Vessel (GPS)</span></div>
+              <div class="legend-item"><span class="legend-dot amber"></span> <span>High Fish Density (PFZ Region)</span></div>
+              <div class="legend-item"><span class="legend-dot yellow"></span> <span>Low Alert Zone</span></div>
+              <div class="legend-item"><span class="legend-dot brown"></span> <span>High Alert Zone</span></div>
+              <div class="legend-item"><span class="legend-dot red"></span> <span>Critical Danger Zone</span></div>
+            </div>
+          </div>
+
+          <!-- Live Weather Metrics Card -->
+          <div class="card">
+            <div class="card-title">
+              <span data-i18n="weatherTitle">Live Marine Weather</span>
+              <span id="weather-freshness" class="freshness-tag">Open-Meteo IMD Calibration</span>
+            </div>
+            <div class="weather-metrics-grid">
+              <div class="metric-box">
+                <div id="val-temp" class="metric-val">28.5°C</div>
+                <div class="metric-lbl" data-i18n="temp">Temperature</div>
+              </div>
+              <div class="metric-box">
+                <div id="val-wind" class="metric-val">16.5 km/h</div>
+                <div class="metric-lbl" data-i18n="wind">Wind Speed</div>
+              </div>
+              <div class="metric-box">
+                <div id="val-wave" class="metric-val">1.1 m</div>
+                <div class="metric-lbl" data-i18n="waves">Wave Height</div>
+              </div>
+              <div class="metric-box">
+                <div id="val-condition" class="metric-val" style="font-size: 0.95rem;">Clear Marine State</div>
+                <div class="metric-lbl" data-i18n="condition">Condition</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Chatbot Assistant ABOVE PFZ, and PFZ Below It -->
+        <div class="fisherman-side-col">
+          
+          <!-- 1. Multilingual Conversational AI Assistant (Top of Column) -->
+          <div class="card" style="padding: 0; overflow:hidden;">
+            <div class="chat-header">
+              <div class="chat-header-title">
+                <span data-i18n="assistantTitle">JalDoot AI Marine Advisory</span>
+              </div>
+              <span style="font-size:0.68rem; background:var(--teal-accent-light); color:var(--teal-accent-dark); padding:2px 8px; border-radius:2px; font-weight:bold;">National Coastal AI</span>
+            </div>
+            
+            <div id="chat-messages-container" class="chat-messages">
+              <!-- Chat bubbles appended here -->
+            </div>
+
+            <div class="chat-input-bar">
+              <button id="btn-voice-chat" class="btn-mic" title="Voice Input (Mic)" aria-label="Voice Input">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              </button>
+              <input type="text" id="chat-input-text" data-i18n="assistantPlaceholder" placeholder="Ask on weather, fishing zones, or safety...">
+              <button id="btn-chat-send" class="btn-send" data-i18n="sendBtn">Send</button>
+            </div>
+          </div>
+
+          <!-- 2. Potential Fishing Zones (PFZ) Recommendations (Directly Underneath Chatbot) -->
+          <div class="card">
+            <div class="card-title">
+              <span data-i18n="pfzTitle">Potential Fishing Zones (PFZ)</span>
+              <span class="freshness-tag">High-Density Contour Zones</span>
+            </div>
+            <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:10px;" data-i18n="pfzSubtitle">
+              Satellite Thermal & Chlorophyll-a Density Contours
+            </p>
+            <div id="pfz-zones-container" class="pfz-list">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- 3. Emergency SOS Broadcast Button -->
+          <div class="sos-bottom-bar">
+            <button id="btn-trigger-sos" class="btn-sos">
+              <span data-i18n="sosBtn">TRANSMIT EMERGENCY SOS</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         3. ADMIN / DISASTER MANAGEMENT DASHBOARD (WITH IN-PLACE RESEARCH TAB)
+         ==================================================================== -->
+    <section id="admin-view" class="view-section">
+      
+      <!-- Requirement 14: In-Place Sub-View Navigation Switcher (Same Page) -->
+      <div class="admin-view-nav">
+        <button id="admin-tab-command" class="admin-nav-btn active">Maritime Command & Fleet Operations</button>
+        <button id="admin-tab-research" class="admin-nav-btn">Oceanographic Research & What-If Simulator</button>
+      </div>
+
+      <!-- SUBVIEW A: Maritime Command & Fleet Operations -->
+      <div id="admin-command-subview">
+        
+        <!-- Requirement 9: Registered 2500, Active 35% -->
+        <div class="admin-stats-strip">
+          <div class="stat-card">
+            <div id="stat-total-vessels" class="stat-val">2500</div>
+            <div class="stat-lbl">Registered Fleet</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-live-vessels" class="stat-val">875</div>
+            <div class="stat-lbl">Active Telemetry Fleet</div>
+          </div>
+          <div class="stat-card alert-card">
+            <div id="stat-active-sos" class="stat-val">--</div>
+            <div class="stat-lbl">Active Distress Beacons</div>
+          </div>
+          <div class="stat-card">
+            <div id="stat-active-hazards" class="stat-val">--</div>
+            <div class="stat-lbl">Active Hazard Sectors</div>
+          </div>
+        </div>
+
+        <!-- Active Distress Alerts Section (Capped at 4) -->
+        <div class="card" style="border-color: var(--marker-red);">
+          <div class="card-title" style="color: var(--marker-red);">
+            <span>Emergency Distress Telemetry Feeds</span>
+            <span class="freshness-tag">20km & 3-Nearest Fallback Dispatch</span>
+          </div>
+          <div id="admin-sos-list">
+            <!-- SOS alerts rendered dynamically -->
+          </div>
+        </div>
+
+        <div class="admin-grid" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px;">
+          <!-- Live Fleet Map Card (Ocean-only Green & Red dots) -->
+          <div class="card">
+            <div class="card-title">
+              <span data-i18n="activeVesselsTitle">Live Maritime Fleet Telemetry</span>
+              <span class="freshness-tag">Arabian Sea & Coastal Waters</span>
+            </div>
+            <div id="admin-marine-map" class="marine-map-container" style="height: 460px;"></div>
+            <div class="map-legend">
+              <div class="legend-item"><span class="legend-dot green"></span> <span>Active Vessel</span></div>
+              <div class="legend-item"><span class="legend-dot red"></span> <span>Distress Active (SOS)</span></div>
+              <div class="legend-item"><span class="legend-dot yellow"></span> <span>Low Alert Zone</span></div>
+              <div class="legend-item"><span class="legend-dot brown"></span> <span>High Alert Zone</span></div>
+              <div class="legend-item"><span class="legend-dot red"></span> <span>Critical Danger Zone</span></div>
+            </div>
+          </div>
+
+          <!-- Vessel Activity & Message Feed -->
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            
+            <div class="card" style="flex: 1;">
+              <div class="card-title">
+                <span data-i18n="recentFeedTitle">Operations & Access Log</span>
+              </div>
+              <div id="admin-activity-feed" class="feed-list">
+                <!-- Activity feed items -->
+              </div>
+            </div>
+
+            <!-- Requirement 7: Unified Q&A Monitor without demo label -->
+            <div class="card" style="flex: 1;">
+              <div class="card-title">
+                <span data-i18n="lastMessagesTitle">Fisherman Inquiries & AI Advisories</span>
+              </div>
+              <div id="admin-last-messages" style="max-height: 250px; overflow-y: auto;">
+                <!-- Unified Q&A cards -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Registered Fleet Table -->
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-title">
+            <span>Active Vessel Registry Telemetry</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Vessel Registration</th>
+                  <th>Captain Name</th>
+                  <th>Coordinates</th>
+                  <th>Telemetry Status</th>
+                  <th>Last Ping</th>
+                </tr>
+              </thead>
+              <tbody id="admin-vessels-tbody">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- SUBVIEW B: Oceanographic Research & What-If Simulator (In-place switch) -->
+      <div id="admin-research-subview" style="display: none;">
+        <div class="card">
+          <div class="card-title">
+            <span>Oceanographic Research & Environmental Simulation Platform</span>
+            <span class="freshness-tag">Marine Science Division</span>
+          </div>
+
+          <!-- Dual Line Charts Grid -->
+          <div class="dual-charts-grid">
+            <!-- Chart 1: Historical Trends -->
+            <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <b style="font-size: 0.82rem; color: var(--text-primary);">Historical Monthly Oceanographic Trends</b>
+                <select id="research-region-select" class="form-select" style="width: auto; padding: 2px 8px; font-size: 0.76rem;">
+                  <option value="Porbandar Offshore">Porbandar Offshore (Gujarat)</option>
+                  <option value="Veraval Deep Trench">Veraval Deep Trench (Gujarat)</option>
+                  <option value="Gulf of Khambhat">Gulf of Khambhat (Gujarat)</option>
+                  <option value="Mumbai High Marine">Mumbai High Marine (Maharashtra)</option>
+                </select>
+              </div>
+              <div style="height: 240px; position: relative;">
+                <canvas id="ocean-trends-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- Chart 2: Dynamic What-If Simulated Fish Yield Curve -->
+            <div style="background: var(--bg-canvas); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <b style="font-size: 0.82rem; color: var(--text-primary);">Simulated Yield vs Thermal Gradient Curve</b>
+                <span class="freshness-tag" style="margin:0;">Dynamic Real-Time Curve</span>
+              </div>
+              <div style="height: 240px; position: relative;">
+                <canvas id="whatif-dynamic-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- What-If Simulator Sliders & Linked Safe-To-Sail Output -->
+          <div class="researcher-simulator-grid">
+            <div>
+              <div class="simulator-slider-group">
+                <label><span>Sea Surface Temperature (SST):</span> <b id="sim-sst-val">26.5°C</b></label>
+                <input type="range" id="sim-sst-slider" class="slider-ctrl" min="20.0" max="34.0" step="0.1" value="26.5">
+              </div>
+
+              <div class="simulator-slider-group">
+                <label><span>Chlorophyll-a Concentration:</span> <b id="sim-chl-val">2.5 mg/m³</b></label>
+                <input type="range" id="sim-chl-slider" class="slider-ctrl" min="0.5" max="6.0" step="0.1" value="2.5">
+              </div>
+
+              <div class="simulator-slider-group">
+                <label><span>Surface Wind Speed:</span> <b id="sim-wind-val">15 km/h</b></label>
+                <input type="range" id="sim-wind-slider" class="slider-ctrl" min="0" max="50" step="1" value="15">
+              </div>
+            </div>
+
+            <div>
+              <div class="sim-output-card">
+                <div style="font-size: 0.78rem; font-weight: 700; color: var(--teal-accent-dark); text-transform: uppercase;">Estimated Fish Productivity Index</div>
+                <div id="sim-result-score" class="sim-output-score">88/100</div>
+                <div style="font-size: 0.8rem; margin-top: 4px;"><b>Biomass Density:</b> <span id="sim-result-density">1600 kg/km²</span></div>
+                <div style="font-size: 0.8rem; margin-top: 2px;"><b>Target Species:</b> <span id="sim-result-species">Pomfret, Mackerel</span></div>
+                <div id="sim-result-advisory" style="font-size: 0.74rem; color: var(--text-muted); margin-top: 6px; font-style: italic;">
+                  Optimal thermal front. High schooling concentration expected.
+                </div>
+                <div id="sim-result-mod" style="font-size: 0.74rem; color: var(--primary-blue); font-weight: bold; margin-top: 6px; border-top: 1px dashed var(--border-light); padding-top: 4px;">
+                  0.0 pts (Linked to Safe-to-Sail score)
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Requirement 12: Mandatory GPS Permission Modal -->
+  <div id="gps-required-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card" style="text-align: center;">
+      <div style="font-size: 1.1rem; font-weight: 900; color: var(--marker-red); margin-bottom: 8px;">
+        MANDATORY GPS ACCESS REQUIRED
+      </div>
+      <p style="font-size: 0.84rem; color: var(--text-primary); line-height: 1.5; margin-bottom: 16px;">
+        JalDoot requires active geolocation access to provide accurate maritime safety scores, boundary hazard alerts, and search-and-rescue distress coordination.
+      </p>
+      <button id="btn-retry-gps" class="btn-primary" style="width: 100%;">
+        Grant / Retry Location Permission
+      </button>
+    </div>
+  </div>
+
+  <!-- SOS Emergency Confirmation Modal -->
+  <div id="sos-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div style="font-size: 1.1rem; font-weight: 900; color: var(--marker-red); text-align: center; margin-bottom: 8px;" data-i18n="sosConfirmTitle">
+        TRANSMIT EMERGENCY DISTRESS BEACON?
+      </div>
+      <p style="font-size: 0.84rem; color: var(--text-muted); text-align: center; margin-top: 8px; line-height: 1.4;" data-i18n="sosConfirmText">
+        This will transmit your vessel registration and live GPS position to the Indian Coast Guard Maritime Rescue Coordination Center and vessels within 20km.
+      </p>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button id="btn-cancel-sos" class="btn-secondary" style="flex: 1;" data-i18n="cancelBtn">Cancel</button>
+        <button id="btn-confirm-sos" class="btn-primary" style="flex: 1.5; background: var(--marker-red);" data-i18n="sosConfirmBtn">
+          CONFIRM AND TRANSMIT
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot Password Modal -->
+  <div id="forgot-password-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary-blue); text-align: center; margin-bottom: 6px;">
+        Reset Account Password
+      </div>
+      <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 14px;">
+        Enter your registered 10-digit mobile number and new password.
+      </p>
+      
+      <div id="reset-error-msg" style="display:none; color:var(--marker-red); background:#FEF2F2; padding:7px; border-radius:4px; font-size:0.78rem; margin-bottom:10px; font-weight:700;"></div>
+      <div id="reset-success-msg" style="display:none; color:#0F7A6A; background:#DDF7EC; padding:7px; border-radius:4px; font-size:0.78rem; margin-bottom:10px; font-weight:700;"></div>
+
+      <form id="form-reset-password">
+        <div class="form-group">
+          <label class="form-label">Registered Mobile Number (10 Digits)</label>
+          <input type="tel" id="reset-phone" class="form-input" placeholder="e.g. 9825000001" maxlength="10" pattern="\d{10}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" id="reset-new-password" class="form-input" placeholder="Enter new password" minlength="4" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" id="reset-confirm-password" class="form-input" placeholder="Confirm new password" minlength="4" required>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 18px;">
+          <button type="button" id="btn-cancel-reset" class="btn-secondary" style="flex: 1;">Cancel</button>
+          <button type="submit" id="btn-submit-reset" class="btn-primary" style="flex: 1.5;">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- External JS Libraries (Leaflet & Chart.js) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- JalDoot Application Modules -->
+  <script src="/static/js/config.js"></script>
+  <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/storage.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/fisherman.js"></script>
+  <script src="/static/js/researcher.js"></script>
+  <script src="/static/js/admin.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
